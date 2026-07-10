@@ -1,0 +1,35 @@
+const fs = require('fs');
+const { MOVIES_DATA } = require('./movies-data.js');
+const template = fs.readFileSync('movie-details.html', 'utf8');
+
+MOVIES_DATA.forEach(movie => {
+    const fileName = `movies/${movie.id}.html`;
+    // Template ke andar data inject karne ke liye yeh line best hai
+    const content = template.replace(
+        '<script src="movies-data.js"></script>',
+        `<script>const item = ${JSON.stringify(movie)};</script>`
+    );
+    fs.writeFileSync(fileName, content);
+    console.log(`Generated: ${fileName}`);
+});
+
+const fs = require('fs');
+const { MOVIES_DATA } = require('./movies-data.js');
+
+const template = fs.readFileSync('movie-details.html', 'utf8');
+0
+
+MOVIES_DATA.forEach(movie => {
+    // Ye line aapke template ko read karti hai aur har movie ke liye file banati hai
+    const fileName = `movies/${movie.id}.html`;
+    
+    // Yahan hum template ke andar ki link logic ko process karenge
+    const content = template.replace(
+        '<script src="movies-data.js"></script>', 
+        `<script>const MOVIES_DATA = ${JSON.stringify([movie])};</script>`
+    );
+    
+    fs.writeFileSync(fileName, content);
+    console.log(`Generated: ${fileName}`);
+});
+

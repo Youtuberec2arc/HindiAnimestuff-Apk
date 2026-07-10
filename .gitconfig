@@ -1,0 +1,7 @@
+[user]
+	name = Youtuberec2arc
+	email = heistbeecrypto@gmail.com
+[safe]
+	directory = *
+[credential]
+	helper = store
