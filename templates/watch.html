@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Watch {{ item.title }}{% if item.season %} {{ item.season }}{% endif %} — {{ site_name }}{% endblock %}
+{% block head_extra %}
+<meta name="robots" content="noindex, follow">
+<link rel="stylesheet" href="{{ asset_prefix }}assets/player.css?v={{ build_version }}">
+{% endblock %}
+{% block content %}
+{% set poster_url = item.poster if item.poster.startswith('http') else root_prefix ~ item.poster %}
+{% set poster_big = (item.poster|poster_src(root_prefix, 780)) if item.poster.startswith('http') else poster_url %}
+<div class="wp-page">
+
+  <div class="wp-topbar">
+    <a class="wp-back" href="{{ root_prefix }}pages/{{ item.id }}.html">&larr; Back to Info</a>
+  </div>
+
+  <!-- ===== PLAYER ===== -->
+  <section class="wp-player" id="wpPlayer" tabindex="-1" aria-label="Video player">
+    <video id="wpVideo" playsinline webkit-playsinline preload="none"></video>
+
+    <!-- tap / click surface (play-pause, double-tap to seek, UI toggle) -->
+    <div class="wp-surface" id="wpSurface"></div>
+
+    <!-- start / stopped screen -->
+    <div class="wp-start" id="wpStart" style="background-image:url('{{ poster_big }}')">
+      <div class="wp-start-shade"></div>
+      <button type="button" class="wp-bigplay" id="wpBigPlay" aria-label="Play">
+        <svg viewBox="0 0 24 24" width="38" height="38" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <div class="wp-start-label" id="wpStartLabel"></div>
+    </div>
+
+    <div class="wp-spinner" id="wpSpinner" hidden><i></i></div>
+    <div class="wp-toast" id="wpToast" hidden></div>
+
+    <!-- error panel -->
+    <div class="wp-error" id="wpError" hidden>
+      <div class="wp-error-box">
+        <div class="wp-error-title">Can&rsquo;t play this video here</div>
+        <p class="wp-error-text" id="wpErrorText">This file may use a format your browser can&rsquo;t play. You can still download it and watch in your video player.</p>
+        <div class="wp-error-actions">
+          <a class="wp-btn wp-btn-primary" id="wpErrorDownload" href="#">&darr; Download</a>
+          <button type="button" class="wp-btn" id="wpErrorRetry">Retry</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- controls -->
+    <div class="wp-ui" id="wpUi">
+      <div class="wp-topline"><span id="wpNow"></span></div>
+      <div class="wp-bottom">
+        <div class="wp-seekrow">
+          <span class="wp-time" id="wpTimeNow">0:00</span>
+          <div class="wp-seek" id="wpSeek" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+            <div class="wp-seek-buf" id="wpBuf"></div>
+            <div class="wp-seek-played" id="wpPlayed"></div>
+            <div class="wp-seek-thumb" id="wpThumb"></div>
+          </div>
+          <span class="wp-time" id="wpTimeTotal">0:00</span>
+        </div>
+
+        <div class="wp-row">
+          <div class="wp-group">
+            <button type="button" class="wp-ctl" id="wpPlay" aria-label="Play / Pause">
+              <svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              <svg class="i-pause" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+            </button>
+            <button type="button" class="wp-ctl" id="wpStop" aria-label="Stop" title="Stop">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v10H7z"/></svg>
+            </button>
+            <button type="button" class="wp-ctl wp-ctl-back" id="wpBack" aria-label="Back 10 seconds" title="Back 10s">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6l-6 6 6 6M19 6l-6 6 6 6"/></svg>
+              <span class="wp-ic-num">10</span>
+            </button>
+            <button type="button" class="wp-ctl wp-ctl-fwd" id="wpFwd" aria-label="Forward 10 seconds" title="Forward 10s">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6l6 6-6 6M13 6l6 6-6 6"/></svg>
+              <span class="wp-ic-num">10</span>
+            </button>
+            {% if p_entries|length > 1 %}
+            <button type="button" class="wp-ctl wp-ctl-prev" id="wpPrev" aria-label="Previous" title="Previous">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 5l-9 7 9 7zM5 5h2.4v14H5z"/></svg>
+            </button>
+            <button type="button" class="wp-ctl" id="wpNext" aria-label="Next episode" title="Next episode">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5l9 7-9 7zM16.6 5H19v14h-2.4z"/></svg>
+            </button>
+            {% endif %}
+          </div>
+
+          <div class="wp-group wp-group-right">
+            <div class="wp-vol">
+              <button type="button" class="wp-ctl" id="wpMute" aria-label="Mute">
+                <svg class="i-vol" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 4V5L7 9z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <svg class="i-muted" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M3 9v6h4l5 4V5L7 9z"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+              <input type="range" class="wp-vol-range" id="wpVol" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+            </div>
+            <div class="wp-qwrap">
+              <button type="button" class="wp-ctl wp-ctl-q" id="wpQBtn" aria-label="Quality" aria-haspopup="true">720p</button>
+              <div class="wp-menu" id="wpQMenu" hidden></div>
+            </div>
+            <button type="button" class="wp-ctl" id="wpFs" aria-label="Fullscreen" title="Fullscreen">
+              <svg class="i-fs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+              <svg class="i-fsx" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <noscript><p class="wp-noscript">Please enable JavaScript to watch videos on this page.</p></noscript>
+
+  <!-- ===== NOW PLAYING + ACTIONS ===== -->
+  <div class="wp-now">
+    <div class="wp-now-text">
+      <h1 class="wp-now-title">{{ item.title }}{% if item.season %} <span class="wp-now-season">{{ item.season }}</span>{% endif %}</h1>
+      <div class="wp-now-ep" id="wpNowEp"></div>
+    </div>
+    <div class="wp-now-actions">
+      <a class="wp-btn wp-btn-primary" id="wpDownload" href="{{ root_prefix }}download/{{ item.id }}.html">&darr; Download</a>
+      <a class="wp-btn" href="{{ root_prefix }}report.html?title={{ item.title | urlencode }}&page=watch%2F{{ item.id }}.html">&#9888; Report</a>
+    </div>
+  </div>
+
+  {% if related_seasons and related_seasons|length > 1 %}
+  <section class="dl-section">
+    <h2 class="dl-section-title">Seasons</h2>
+    <div class="dl-season-row">
+      {% for s in related_seasons %}
+      <a class="dl-season-chip {{ 'active' if s.id == item.id else '' }}" href="{{ root_prefix }}watch/{{ s.id }}.html">{{ s.season or 'Season' }}</a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- ===== EPISODES / PARTS ===== -->
+  {% if p_entries|length > 1 %}
+  <section class="dl-section">
+    <h2 class="dl-section-title">{{ "Episodes" if is_episodic else "Parts" }}</h2>
+    <div class="wp-ep-grid {{ '' if is_episodic else 'wp-ep-grid-wide' }}" id="wpEpGrid">
+      {% for key, label, qs in p_entries %}
+      <button type="button" class="wp-ep" data-index="{{ loop.index0 }}" title="{{ label }}">{{ key if is_episodic else label }}</button>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- ===== INFORMATION (separate from the player) ===== -->
+  <section class="dl-section">
+    <h2 class="dl-section-title">Information</h2>
+    <div class="wp-info">
+      <div class="wp-info-poster">
+        <img src="{{ poster_url }}" alt="{{ item.title }}" onerror="this.style.display='none'">
+      </div>
+      <div class="wp-info-body">
+        <div class="dv-rating-row">
+          {% if item.rating %}<div class="dv-rating-badge">★ {{ item.rating }}<sub>/10</sub></div>{% endif %}
+          <div class="dv-genre-tags">
+            {% for g in item.genres %}<span class="dv-genre-tag">{{ g }}</span>{% endfor %}
+          </div>
+        </div>
+        <div class="dv-pill-row">
+          {% if item.quality_tag %}<span class="dv-badge-type">{{ item.quality_tag }}</span>{% endif %}
+          {% if item.episode_tag %}<span class="dv-info-pill dv-status-ok">{{ item.episode_tag|replace("E ", "EP ") }}</span>{% endif %}
+          {% if item.languages %}<span class="dv-info-pill dv-lang">{{ item.languages|join(' · ') }}</span>{% endif %}
+        </div>
+        {% if item.description %}<p class="dv-synopsis">{{ item.description }}</p>{% endif %}
+        <div class="dv-spec-grid">
+          {% if item.runtime %}<div class="dv-spec"><div class="dv-spec-label">Runtime</div><div class="dv-spec-value">{{ item.runtime }}</div></div>{% endif %}
+          {% if item.languages %}<div class="dv-spec"><div class="dv-spec-label">Language</div><div class="dv-spec-value">{{ item.languages|join(', ') }}</div></div>{% endif %}
+          {% if item.subtitle %}<div class="dv-spec"><div class="dv-spec-label">Subtitle</div><div class="dv-spec-value">{{ item.subtitle }}</div></div>{% endif %}
+          {% if item.episodes %}<div class="dv-spec"><div class="dv-spec-label">Episodes</div><div class="dv-spec-value">{{ item.episodes }}</div></div>{% endif %}
+          {% if item.type %}<div class="dv-spec"><div class="dv-spec-label">Type</div><div class="dv-spec-value">{{ item.type }}</div></div>{% endif %}
+          {% if item.year %}<div class="dv-spec"><div class="dv-spec-label">Year</div><div class="dv-spec-value">{{ item.year }}</div></div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== YOU MAY ALSO LIKE ===== -->
+  {% if related_items %}
+  <section class="dl-section">
+    <h2 class="dl-section-title">♥ You May Also Like</h2>
+    <div class="dl-related-grid wp-related-grid">
+      {% for r in related_items %}
+      <a class="dl-related-card" href="{{ root_prefix }}pages/{{ r.id }}.html">
+        <img src="{{ r.poster|poster_src(root_prefix, 342) if r.poster.startswith('http') else root_prefix ~ r.poster }}" alt="{{ r.title }}" loading="lazy" onerror="this.src='{{ asset_prefix }}assets/logo.svg'">
+        <span class="dl-related-title">{{ r.title }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- ===== JOIN TELEGRAM ===== -->
+  <section class="wp-tg">
+    <div class="wp-tg-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="currentColor" viewBox="0 0 496 512"><path d="M446.7 98.6l-67.6 318.8c-5.1 22.5-18.4 28.1-37.3 17.5l-103-75.9-49.7 47.8c-5.5 5.5-10.1 10.1-20.7 10.1l7.4-104.9 190.9-172.5c8.3-7.4-1.8-11.5-12.9-4.1L117.8 284 16.2 252.2c-22.1-6.9-22.5-22.1 4.6-32.7L418.2 66.4c18.4-6.9 34.5 4.1 28.5 32.2z"/></svg>
+    </div>
+    <div class="wp-tg-text">
+      <strong>Join our Telegram</strong>
+      <span>New episodes, daily updates &amp; backup links if this site goes down.</span>
+    </div>
+    <a class="wp-tg-btn" href="{{ telegram_join_url }}" target="_blank" rel="noopener">Join Now</a>
+  </section>
+
+  <!-- ===== COMMENTS ===== -->
+  <section class="dl-section wp-comments">
+    {% include "_comments_box.html" %}
+  </section>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ asset_prefix }}assets/{{ download_data_js }}?v={{ build_version }}"></script>
+<script>window.PLAYER_CFG = {{ player_cfg|tojson }};</script>
+<script src="{{ asset_prefix }}assets/player.js?v={{ build_version }}"></script>
+{% include "_comments_script.html" %}
+{% endblock %}
